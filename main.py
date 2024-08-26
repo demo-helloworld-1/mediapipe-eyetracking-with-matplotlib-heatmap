@@ -16,6 +16,11 @@ screen_width, screen_height = pyautogui.size()
 
 # Calibration variables
 calibration_points = {'left': None, 'right': None, 'top': None, 'bottom': None}
+iris_calibration = {'left': None, 'right': None, 'top': None, 'bottom': None}
+
+# Flags for calibration mode
+screen_calibration_mode = True
+iris_calibration_mode = False
 
 # Configure FaceMesh
 with mp_face_mesh.FaceMesh(
@@ -61,44 +66,73 @@ with mp_face_mesh.FaceMesh(
                 
                 iris_center = get_center(left_iris_landmarks + right_iris_landmarks)
                 
-                # Calibration logic
-                if calibration_points['left'] is None or calibration_points['right'] is None or calibration_points['top'] is None or calibration_points['bottom'] is None:
-                    # Assuming some condition or user input to set the calibration points
-                    print("Calibration mode: Adjust your position to the corners of the screen.")
-                    
-                    # For demonstration, we'll assume 'calibration' key press will set points
-                    cv2.putText(frame_bgr, "Press 'c' to calibrate the extreme points", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                # Calibration mode indicators
+                if screen_calibration_mode:
+                    cv2.putText(frame_bgr, "Press 'c' to calibrate screen boundaries", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                     
                     if cv2.waitKey(1) & 0xFF == ord('c'):
                         if calibration_points['left'] is None:
                             calibration_points['left'] = iris_center
-                            print("Left boundary calibrated.")
-                            
+                            print("Screen left boundary calibrated.")
                         elif calibration_points['right'] is None:
                             calibration_points['right'] = iris_center
-                            print("Right boundary calibrated.")
+                            print("Screen right boundary calibrated.")
                         elif calibration_points['top'] is None:
                             calibration_points['top'] = iris_center
-                            print("Top boundary calibrated.")
+                            print("Screen top boundary calibrated.")
                         elif calibration_points['bottom'] is None:
                             calibration_points['bottom'] = iris_center
-                            print("Bottom boundary calibrated.")
-                        
-                if all(v is not None for v in calibration_points.values()):
-                    # Map the central point to screen coordinates using calibration
+                            print("Screen bottom boundary calibrated.")
+                            screen_calibration_mode = False
+                            iris_calibration_mode = True
+                            print("Switching to iris calibration mode.")
+                    
+                elif iris_calibration_mode:
+                    cv2.putText(frame_bgr, "Press 'i' to calibrate iris ball tracking", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    
+                    if cv2.waitKey(1) & 0xFF == ord('i'):
+                        if iris_calibration['left'] is None:
+                            iris_calibration['left'] = iris_center
+                            print("Iris left boundary calibrated.")
+                        elif iris_calibration['right'] is None:
+                            iris_calibration['right'] = iris_center
+                            print("Iris right boundary calibrated.")
+                        elif iris_calibration['top'] is None:
+                            iris_calibration['top'] = iris_center
+                            print("Iris top boundary calibrated.")
+                        elif iris_calibration['bottom'] is None:
+                            iris_calibration['bottom'] = iris_center
+                            print("Iris bottom boundary calibrated.")
+                            iris_calibration_mode = False
+                            print("Calibration complete.")
+                    
+                # Move cursor based on calibration if both calibrations are complete
+                if all(v is not None for v in calibration_points.values()) and all(v is not None for v in iris_calibration.values()):
                     x_range = calibration_points['right'][0] - calibration_points['left'][0]
                     y_range = calibration_points['bottom'][1] - calibration_points['top'][1]
                     
+                    # Map iris center to screen coordinates
                     x_screen = int(((iris_center[0] - calibration_points['left'][0]) / x_range) * screen_width)
                     y_screen = int(((iris_center[1] - calibration_points['top'][1]) / y_range) * screen_height)
                     
+                    iris_x_range = iris_calibration['right'][0] - iris_calibration['left'][0]
+                    iris_y_range = iris_calibration['bottom'][1] - iris_calibration['top'][1]
+                    
+                    # Adjust the x and y screen coordinates considering iris movement
+                    x_screen_iris = int(((iris_center[0] - iris_calibration['left'][0]) / iris_x_range) * screen_width)
+                    y_screen_iris = int(((iris_center[1] - iris_calibration['top'][1]) / iris_y_range) * screen_height)
+                    
+                    # Smooth cursor movement
+                    x_screen = int(0.8 * x_screen + 0.2 * x_screen_iris)
+                    y_screen = int(0.8 * y_screen + 0.2 * y_screen_iris)
+                    
                     # Move the cursor
                     pyautogui.moveTo(x_screen, y_screen)
-                    
-                    # Draw circles around the landmarks for visualization
-                    for landmark in left_iris_landmarks + right_iris_landmarks:
-                        x, y = int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0])
-                        cv2.circle(frame_bgr, (x, y), 2, (0, 255, 0), -1)
+                
+                # Draw circles around the landmarks for visualization
+                for landmark in left_iris_landmarks + right_iris_landmarks:
+                    x, y = int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0])
+                    cv2.circle(frame_bgr, (x, y), 2, (0, 255, 0), -1)
         
         # Display the image with annotations
         cv2.imshow('Mediapipe Iris and Face Landmarks', frame_bgr)
