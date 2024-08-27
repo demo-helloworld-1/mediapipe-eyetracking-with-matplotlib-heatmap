@@ -123,8 +123,8 @@ with mp_face_mesh.FaceMesh(
                     y_screen_iris = int(((iris_center[1] - iris_calibration['top'][1]) / iris_y_range) * screen_height)
                     
                     # Smooth cursor movement
-                    x_screen = int(0.8 * x_screen + 0.2 * x_screen_iris)
-                    y_screen = int(0.8 * y_screen + 0.2 * y_screen_iris)
+                    x_screen = int(0.7 * x_screen + 0.5 * x_screen_iris)
+                    y_screen = int(0.7 * y_screen + 0.5 * y_screen_iris)
                     
                     # Move the cursor
                     pyautogui.moveTo(x_screen, y_screen)
