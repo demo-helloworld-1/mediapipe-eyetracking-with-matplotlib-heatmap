@@ -221,23 +221,16 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                             x_screen = int(sum(coord[0] for coord in proximity_coords) / len(proximity_coords))
                             y_screen = int(sum(coord[1] for coord in proximity_coords) / len(proximity_coords))
                         
-                        if x_screen > -300 and x_screen < 3500 and y_screen > -200 and y_screen < 2000:
-                            
-                            if x_screen > 1800:
-                                x_screen = 1800
-                                
-                            if y_screen > 900:
-                                y_screen = 900
-                            
-                            #print(x_screen,y_screen)
-                            # Update the Tkinter window
-                            root.geometry(f"{eye_image.width}x{eye_image.height}+{x_screen}+{y_screen}")  # Set the window size and position
-                            #root.geometry(f"{x_screen}+{y_screen}")  # Set the window size and position
-                            root.update()
+                        
+                        print(f'X Coordinate: {x_screen}, Y Coordinate: {y_screen}')
+                        #print(x_screen,y_screen)
+                        # Update the Tkinter window
+                        root.geometry(f"{eye_image.width}x{eye_image.height}+{x_screen}+{y_screen}")  # Set the window size and position
+                        #root.geometry(f"{x_screen}+{y_screen}")  # Set the window size and position
+                        root.update()
 
-                            # Write coordinates to CSV file
-                            print(f'X Coordinate: {x_screen}, Y Coordinate: {y_screen}')
-                            csv_writer.writerow([x_screen, y_screen])
+                        # Write coordinates to CSV file
+                        csv_writer.writerow([x_screen, y_screen])
                         
                     # Draw circles around the landmarks for visualization
                     for landmark in left_iris_landmarks + right_iris_landmarks:
