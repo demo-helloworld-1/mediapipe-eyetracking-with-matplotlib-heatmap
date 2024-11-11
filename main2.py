@@ -16,7 +16,8 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 
 # Initialize webcam
-cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(0)
+# cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
 
 # Get screen size
 screen_width, screen_height = pyautogui.size()
@@ -34,6 +35,11 @@ extra_calibration_mode = False
 PROXIMITY_THRESHOLD = 300.0
 old_coordinates = (800,800)
 proximity_coords = []
+
+value1 = 3000
+value2 = 2000
+
+flag = True
 
 def distance(coord1, coord2):
     return math.sqrt((coord1[0] - coord2[0]) ** 2 + (coord1[1] - coord2[1]) ** 2)
@@ -133,15 +139,36 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                             if calibration_points['left'] is None:
                                 calibration_points['left'] = iris_center
                                 print("Screen left boundary calibrated.")
+                                print("Left Boundry: ")
+                                value1 = iris_center[0]*screen_width
+                                value2 = iris_center[1]*screen_height
+                                print("X_Value: ", value1)
+                                print("Y_Value: ", value2)
                             elif calibration_points['right'] is None:
                                 calibration_points['right'] = iris_center
                                 print("Screen right boundary calibrated.")
+                                print("Right Boundry: ",iris_center)
+                                value1 = iris_center[0]*screen_width
+                                value2 = iris_center[1]*screen_height
+                                print("X_Value: ", value1)
+                                print("Y_Value: ", value2)
                             elif calibration_points['top'] is None:
                                 calibration_points['top'] = iris_center
                                 print("Screen top boundary calibrated.")
+                                print("Top Boundry: ",iris_center)
+                                value1 = iris_center[0]*screen_width
+                                value2 = iris_center[1]*screen_height
+                                print("X_Value: ", value1)
+                                print("Y_Value: ", value2)
+                                
                             elif calibration_points['bottom'] is None:
                                 calibration_points['bottom'] = iris_center
                                 print("Screen bottom boundary calibrated.")
+                                print("Bottom Boundry: ",iris_center)
+                                value1 = iris_center[0]*screen_width
+                                value2 = iris_center[1]*screen_height
+                                print("X_Value: ", value1)
+                                print("Y_Value: ", value2)
                                 screen_calibration_mode = False
                                 iris_calibration_mode = True
                                 print("Switching to iris calibration mode.")
@@ -183,6 +210,8 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                                 print("Extra bottom boundary calibrated.")
                                 extra_calibration_mode = False
                                 print("Calibration complete.")
+                    
+                    
                         
                     # Move the cursor based on calibration if both calibrations are complete
                     if all(v is not None for v in calibration_points.values()) and all(v is not None for v in iris_calibration.values()) and all(v is not None for v in extra_calibration.values()):
@@ -211,6 +240,23 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         x_screen = int(0.4 * x_screen + 0.3 * x_screen_iris + 0.3 * x_screen_extra)
                         y_screen = int(0.4 * y_screen + 0.3 * y_screen_iris + 0.3 * y_screen_extra)
                         
+                        def coordinates(x_screen, y_screen):
+                            if x_screen > -300 and x_screen < 3500 and y_screen > -200 and y_screen < 2000:
+                                
+                                while flag:
+                                    if cv2.waitKey(1) & 0xFF == ord('k'):
+                                        value1=x_screen
+                                return  (value1)
+                            
+                        def coordinates2(x_screen, y_screen):
+                            if x_screen > -300 and x_screen < 3500 and y_screen > -200 and y_screen < 2000:
+                                while flag:
+                                    if cv2.waitKey(1) & 0xFF == ord('o'):
+                                        value2=y_screen
+                                return (value2)
+                            
+                            flag=False
+                        
                         #time.sleep(0.05)
                         new_coordinates = (x_screen,y_screen)
                         if distance(old_coordinates, new_coordinates) > PROXIMITY_THRESHOLD:
@@ -220,19 +266,23 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                             proximity_coords.append(new_coordinates)
                             x_screen = int(sum(coord[0] for coord in proximity_coords) / len(proximity_coords))
                             y_screen = int(sum(coord[1] for coord in proximity_coords) / len(proximity_coords))
-                        
-                        if x_screen > -300 and x_screen < 3500 and y_screen > -200 and y_screen < 2000:
                             
-                            if x_screen > 1800:
-                                x_screen = 1800
+                            if x_screen > coordinates(x_screen,y_screen):
+                                x_screen = coordinates()
                                 
-                            if y_screen > 900:
-                                y_screen = 900
+                            if x_screen < 0:
+                                x_screen = 0
+                            
+                            if y_screen > coordinates2():
+                                y_screen = coordinates()
+                                
+                            if y_screen <0:
+                                y_screen = 0
                             
                             #print(x_screen,y_screen)
                             # Update the Tkinter window
                             root.geometry(f"{eye_image.width}x{eye_image.height}+{x_screen}+{y_screen}")  # Set the window size and position
-                            #root.geometry(f"{x_screen}+{y_screen}")  # Set the window size and position
+                            root.geometry(f"{x_screen}+{y_screen}")  # Set the window size and position
                             root.update()
 
                             # Write coordinates to CSV file
@@ -254,3 +304,7 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
 cap.release()
 cv2.destroyAllWindows()
 
+
+    
+
+            

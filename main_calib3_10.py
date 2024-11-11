@@ -16,7 +16,7 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 
 # Initialize webcam
-cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(0)
 
 # Get screen size
 screen_width, screen_height = pyautogui.size()
@@ -100,6 +100,9 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         connections=mp_face_mesh.FACEMESH_TESSELATION,
                         landmark_drawing_spec=None,
                         connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style())
+                    
+                    if cv2.waitKey(1) & 0xFF == ord('d'):
+                        pdb.set_trace()
                     
                     # Extract relevant landmarks
                     left_iris_landmarks = [face_landmarks.landmark[i] for i in range(474, 478)]
@@ -207,9 +210,12 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         x_screen_extra = int(((iris_center[0] - extra_calibration['left'][0]) / extra_x_range) * screen_width)
                         y_screen_extra = int(((iris_center[1] - extra_calibration['top'][1]) / extra_y_range) * screen_height)
                         
-                        # Smooth cursor movement
-                        x_screen = int(0.4 * x_screen + 0.3 * x_screen_iris + 0.3 * x_screen_extra)
-                        y_screen = int(0.4 * y_screen + 0.3 * y_screen_iris + 0.3 * y_screen_extra)
+                        alpha = 0.2  # Smoothing factor (lower values = more smoothing)
+                        x_screen = int(alpha * x_screen + (1 - alpha) * old_coordinates[0])
+                        y_screen = int(alpha * y_screen + (1 - alpha) * old_coordinates[1])
+
+                        # Update old_coordinates with the smoothed values
+                        old_coordinates = (x_screen, y_screen)
                         
                         #time.sleep(0.05)
                         new_coordinates = (x_screen,y_screen)
@@ -218,11 +224,25 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                             proximity_coords = [new_coordinates]                            
                         else:
                             proximity_coords.append(new_coordinates)
-                            x_screen = int(sum(coord[0] for coord in proximity_coords) / len(proximity_coords))
-                            y_screen = int(sum(coord[1] for coord in proximity_coords) / len(proximity_coords))
-                        
-                        
-                        print(f'X Coordinate: {x_screen}, Y Coordinate: {y_screen}')
+                            if len(proximity_coords)> 10:
+                                x_screen = int(sum(coord[0] for coord in proximity_coords[-10:]) / len(proximity_coords[-10:]))
+                                y_screen = int(sum(coord[1] for coord in proximity_coords[-10:]) / len(proximity_coords[-10:]))
+                            else:
+                                x_screen = int(sum(coord[0] for coord in proximity_coords) / len(proximity_coords))
+                                y_screen = int(sum(coord[1] for coord in proximity_coords) / len(proximity_coords))
+                                
+                            if x_screen > 1800:
+                                x_screen = 1800
+                                
+                            if x_screen < 0:
+                                x_screen = 0
+                            
+                            if y_screen > 1100:
+                                y_screen = 1100
+                                
+                            if y_screen <0:
+                                y_screen = 0
+                            
                         #print(x_screen,y_screen)
                         # Update the Tkinter window
                         root.geometry(f"{eye_image.width}x{eye_image.height}+{x_screen}+{y_screen}")  # Set the window size and position
@@ -230,6 +250,7 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         root.update()
 
                         # Write coordinates to CSV file
+                        print(f'X Coordinate: {x_screen}, Y Coordinate: {y_screen}')
                         csv_writer.writerow([x_screen, y_screen])
                         
                     # Draw circles around the landmarks for visualization
@@ -238,7 +259,9 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         cv2.circle(frame_bgr, (x, y), 2, (0, 255, 0), -1)
             
             # Display the image with annotations
+            #resized_image = cv2.resize(frame_bgr, (screen_width-20, screen_height-100))
             cv2.imshow('Mediapipe Iris and Face Landmarks', frame_bgr)
+            ##cv2.imshow('Mediapipe Iris and Face Landmarks', resized_image)
             
             if cv2.waitKey(5) & 0xFF == 27:  # Press 'Esc' to exit
                 root.destroy()  # Destroy the Tkinter window
@@ -246,4 +269,3 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
 
 cap.release()
 cv2.destroyAllWindows()
-
