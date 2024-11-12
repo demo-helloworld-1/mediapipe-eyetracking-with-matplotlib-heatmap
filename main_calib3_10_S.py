@@ -24,15 +24,17 @@ screen_width, screen_height = pyautogui.size()
 # Calibration variables
 calibration_points = {'left': None, 'right': None, 'top': None, 'bottom': None}
 iris_calibration = {'left': None, 'right': None, 'top': None, 'bottom': None}
+center_calibration = {'x': None, 'y': None}  # New calibration for iris center
 extra_calibration = {'left': None, 'right': None, 'top': None, 'bottom': None}
 
 # Flags for calibration mode
 screen_calibration_mode = True
 iris_calibration_mode = False
+center_calibration_mode = False  # New flag for center calibration
 extra_calibration_mode = False
 
 PROXIMITY_THRESHOLD = 300.0
-old_coordinates = (800,800)
+old_coordinates = (800, 800)
 proximity_coords = []
 
 def distance(coord1, coord2):
@@ -45,20 +47,18 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
 
     # Configure FaceMesh
     with mp_face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5) as face_mesh:
-        
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5) as face_mesh:
+
         # Initialize Tkinter
         root = tk.Tk()
         root.overrideredirect(True)  # Remove the window border
         root.attributes("-topmost", True)  # Keep the window on top
 
         # Load and check the eye image
-        
         try:
-            #pdb.set_trace()
             eye_image = Image.open("eye.png")
             eye_image = eye_image.resize((100, 100), Image.LANCZOS)  # Resize the image to fit your needs
             eye_photo = ImageTk.PhotoImage(eye_image)
@@ -70,27 +70,26 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
             exit()
 
         # Create a label to display the image
-        #label = tk.Label(root, image=eye_photo, bg='black')
-        #label.pack()
-        
+        # label = tk.Label(root, image=eye_photo, bg='black')
+        # label.pack()
+
         previous_iris_center = None
-        #pdb.set_trace()
 
         while cap.isOpened():
             success, frame = cap.read()
             if not success:
                 print("Ignoring empty camera frame.")
                 continue
-            
+
             # Convert the image color from BGR to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
+
             # Process the image and find facial landmarks
             results = face_mesh.process(frame_rgb)
-            
+
             # Convert back to BGR for rendering with OpenCV
             frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-            
+
             if results.multi_face_landmarks:
                 for face_landmarks in results.multi_face_landmarks:
                     # Draw face mesh annotations on the image
@@ -100,20 +99,20 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         connections=mp_face_mesh.FACEMESH_TESSELATION,
                         landmark_drawing_spec=None,
                         connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style())
-                    
+
                     if cv2.waitKey(1) & 0xFF == ord('d'):
                         pdb.set_trace()
-                    
+
                     # Extract relevant landmarks
                     left_iris_landmarks = [face_landmarks.landmark[i] for i in range(474, 478)]
                     right_iris_landmarks = [face_landmarks.landmark[i] for i in range(469, 473)]
-                    
+
                     # Calculate the central point of the iris landmarks
                     def get_center(landmarks):
                         x_coords = [lm.x for lm in landmarks]
                         y_coords = [lm.y for lm in landmarks]
                         return np.mean(x_coords), np.mean(y_coords)
-                    
+
                     iris_center = get_center(left_iris_landmarks + right_iris_landmarks)
 
                     if previous_iris_center is not None:
@@ -124,10 +123,11 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                             print("Significant deviation detected, recalibrating.")
                             screen_calibration_mode = True
                             iris_calibration_mode = False
+                            center_calibration_mode = False  # Reset center calibration
                             extra_calibration_mode = False
 
                     previous_iris_center = iris_center
-                    
+
                     # Calibration mode indicators
                     if screen_calibration_mode:
                         cv2.putText(frame_bgr, "Press 'c' to calibrate screen boundaries", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -147,8 +147,9 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                                 print("Screen bottom boundary calibrated.")
                                 screen_calibration_mode = False
                                 iris_calibration_mode = True
+                                print("Calibration Points:", calibration_points)
                                 print("Switching to iris calibration mode.")
-                        
+
                     elif iris_calibration_mode:
                         cv2.putText(frame_bgr, "Press 'i' to calibrate iris ball tracking", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                         
@@ -167,9 +168,11 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                                 print("Iris bottom boundary calibrated.")
                                 iris_calibration_mode = False
                                 extra_calibration_mode = True
+                                print("Iris Calibration Points:", iris_calibration)
                                 print("Switching to extra calibration mode.")
+
                     elif extra_calibration_mode:
-                        cv2.putText(frame_bgr, "Press 'e' to calibrate iris ball tracking", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        cv2.putText(frame_bgr, "Press 'e' to calibrate extra boundaries", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                         
                         if cv2.waitKey(1) & 0xFF == ord('e'):
                             if extra_calibration['left'] is None:
@@ -185,10 +188,24 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                                 extra_calibration['bottom'] = iris_center
                                 print("Extra bottom boundary calibrated.")
                                 extra_calibration_mode = False
-                                print("Calibration complete.")
+                                center_calibration_mode = True
+                                print("Extra Calibration Points:", extra_calibration)
+                                print("Switching to center calibration mode.")
+
+                    # New Center Calibration Mode
+                    elif center_calibration_mode:
+                        cv2.putText(frame_bgr, "Press 'x' to calibrate center point", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                         
-                    # Move the cursor based on calibration if both calibrations are complete
-                    if all(v is not None for v in calibration_points.values()) and all(v is not None for v in iris_calibration.values()) and all(v is not None for v in extra_calibration.values()):
+                        if cv2.waitKey(1) & 0xFF == ord('x'):
+                            calibration_points['center'] = iris_center
+                            print("Center point calibrated:", calibration_points['center'])
+                            center_calibration_mode = False
+                            print("Calibration complete. All points:", calibration_points, iris_calibration, extra_calibration)
+
+
+                    # Move the cursor based on calibration if all calibrations are complete
+                    if (all(v is not None for v in calibration_points.values()) and all(v is not None for v in iris_calibration.values()) and all(v is not None for v in extra_calibration.values()) and calibration_points.get('center') is not None):
+
                         x_range = calibration_points['right'][0] - calibration_points['left'][0]
                         y_range = calibration_points['bottom'][1] - calibration_points['top'][1]
                         
@@ -210,9 +227,14 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         x_screen_extra = int(((iris_center[0] - extra_calibration['left'][0]) / extra_x_range) * screen_width)
                         y_screen_extra = int(((iris_center[1] - extra_calibration['top'][1]) / extra_y_range) * screen_height)
                         
-                        alpha = 0.2  # Smoothing factor (lower values = more smoothing)
-                        x_screen = int(alpha * x_screen + (1 - alpha) * old_coordinates[0])
-                        y_screen = int(alpha * y_screen + (1 - alpha) * old_coordinates[1])
+                        # alpha = 0.2  # Smoothing factor (lower values = more smoothing)
+                        # x_screen = int(alpha * x_screen + (1 - alpha) * old_coordinates[0])
+                        # y_screen = int(alpha * y_screen + (1 - alpha) * old_coordinates[1])
+                        
+                        # Smooth cursor movement
+                        x_screen = int(0.3 * x_screen + 0.6 * x_screen_iris + 0.2 * x_screen_extra)
+                        y_screen = int(0.3 * y_screen + 0.6 * y_screen_iris + 0.2 * y_screen_extra)
+                        
 
                         # Update old_coordinates with the smoothed values
                         old_coordinates = (x_screen, y_screen)
@@ -257,15 +279,15 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                     for landmark in left_iris_landmarks + right_iris_landmarks:
                         x, y = int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0])
                         cv2.circle(frame_bgr, (x, y), 2, (0, 255, 0), -1)
-            
-            # Display the image with annotations
-            #resized_image = cv2.resize(frame_bgr, (screen_width-20, screen_height-100))
-            cv2.imshow('Mediapipe Iris and Face Landmarks', frame_bgr)
-            ##cv2.imshow('Mediapipe Iris and Face Landmarks', resized_image)
-            
-            if cv2.waitKey(5) & 0xFF == 27:  # Press 'Esc' to exit
-                root.destroy()  # Destroy the Tkinter window
-                break
 
-cap.release()
-cv2.destroyAllWindows()
+                    # Display the image with annotations
+                    #resized_image = cv2.resize(frame_bgr, (screen_width-20, screen_height-100))
+                    cv2.imshow('Mediapipe Iris and Face Landmarks', frame_bgr)
+                    #cv2.imshow('Mediapipe Iris and Face Landmarks', resized_image)
+
+                    if cv2.waitKey(5) & 0xFF == 27:  # Press 'Esc' to exit
+                        root.destroy()  # Destroy the Tkinter window
+                        break
+
+        cap.release()
+        cv2.destroyAllWindows()
