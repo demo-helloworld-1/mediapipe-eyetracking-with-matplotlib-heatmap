@@ -21,6 +21,8 @@ cap = cv2.VideoCapture(0)
 # Get screen size
 screen_width, screen_height = pyautogui.size()
 
+print(f'Screen Width: {screen_width}, Screen Hight: {screen_height}')
+
 # Calibration variables
 calibration_points = {'left': None, 'right': None, 'top': None, 'bottom': None}
 iris_calibration = {'left': None, 'right': None, 'top': None, 'bottom': None}
@@ -33,17 +35,31 @@ iris_calibration_mode = False
 center_calibration_mode = False  # New flag for center calibration
 extra_calibration_mode = False
 
+# Threshold for Gaze Smoothness 
 PROXIMITY_THRESHOLD = 300.0
+# Threshold for blink detection
+EAR_THRESHOLD = 0.2
 old_coordinates = (800, 800)
 proximity_coords = []
 
 def distance(coord1, coord2):
     return math.sqrt((coord1[0] - coord2[0]) ** 2 + (coord1[1] - coord2[1]) ** 2)
 
+# Function to calculate EAR
+def calculate_ear(eye_landmarks):
+    # Calculate the distances between the vertical eye landmarks
+    vertical_1 = np.linalg.norm(np.array([eye_landmarks[1].x, eye_landmarks[1].y]) - np.array([eye_landmarks[5].x, eye_landmarks[5].y]))
+    vertical_2 = np.linalg.norm(np.array([eye_landmarks[2].x, eye_landmarks[2].y]) - np.array([eye_landmarks[4].x, eye_landmarks[4].y]))
+    # Calculate the distance between the horizontal eye landmarks
+    horizontal = np.linalg.norm(np.array([eye_landmarks[0].x, eye_landmarks[0].y]) - np.array([eye_landmarks[3].x, eye_landmarks[3].y]))
+    # Calculate EAR
+    ear = (vertical_1 + vertical_2) / (2.0 * horizontal)
+    return ear
+
 # Open CSV file for writing coordinates
 with open('coordinates.csv', mode='w', newline='') as csv_file:
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(['x_screen', 'y_screen'])  # Write header row
+    csv_writer.writerow(['x_screen', 'y_screen', 'blink_detected'])  # Write header row
 
     # Configure FaceMesh
     with mp_face_mesh.FaceMesh(
@@ -106,6 +122,10 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                     # Extract relevant landmarks
                     left_iris_landmarks = [face_landmarks.landmark[i] for i in range(474, 478)]
                     right_iris_landmarks = [face_landmarks.landmark[i] for i in range(469, 473)]
+                    
+                     # Extract eye landmarks (example indices, adjust as needed)
+                    left_eye_landmarks = [face_landmarks.landmark[i] for i in [33, 160, 158, 133, 153, 144]]
+                    right_eye_landmarks = [face_landmarks.landmark[i] for i in [362, 385, 387, 263, 373, 380]]
 
                     # Calculate the central point of the iris landmarks
                     def get_center(landmarks):
@@ -232,8 +252,8 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         # y_screen = int(alpha * y_screen + (1 - alpha) * old_coordinates[1])
                         
                         # Smooth cursor movement
-                        x_screen = int(0.3 * x_screen + 0.6 * x_screen_iris + 0.2 * x_screen_extra)
-                        y_screen = int(0.3 * y_screen + 0.6 * y_screen_iris + 0.2 * y_screen_extra)
+                        x_screen = int(0.4 * x_screen + 0.5 * x_screen_iris + 0.3 * x_screen_extra)
+                        y_screen = int(0.4 * y_screen + 0.5 * y_screen_iris + 0.3 * y_screen_extra)
                         
 
                         # Update old_coordinates with the smoothed values
@@ -246,9 +266,9 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                             proximity_coords = [new_coordinates]                            
                         else:
                             proximity_coords.append(new_coordinates)
-                            if len(proximity_coords)> 10:
-                                x_screen = int(sum(coord[0] for coord in proximity_coords[-10:]) / len(proximity_coords[-10:]))
-                                y_screen = int(sum(coord[1] for coord in proximity_coords[-10:]) / len(proximity_coords[-10:]))
+                            if len(proximity_coords)> 9:
+                                x_screen = int(sum(coord[0] for coord in proximity_coords[-9:]) / len(proximity_coords[-9:]))
+                                y_screen = int(sum(coord[1] for coord in proximity_coords[-9:]) / len(proximity_coords[-9:]))
                             else:
                                 x_screen = int(sum(coord[0] for coord in proximity_coords) / len(proximity_coords))
                                 y_screen = int(sum(coord[1] for coord in proximity_coords) / len(proximity_coords))
@@ -264,6 +284,13 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                                 
                             if y_screen <0:
                                 y_screen = 0
+                        
+                        # Calculate EAR for both eyes
+                        left_ear = calculate_ear(left_eye_landmarks)
+                        right_ear = calculate_ear(right_eye_landmarks)
+                        
+                        # Check if blink occurred
+                        blink_detected = (left_ear < EAR_THRESHOLD) and (right_ear < EAR_THRESHOLD)
                             
                         #print(x_screen,y_screen)
                         # Update the Tkinter window
@@ -272,8 +299,8 @@ with open('coordinates.csv', mode='w', newline='') as csv_file:
                         root.update()
 
                         # Write coordinates to CSV file
-                        print(f'X Coordinate: {x_screen}, Y Coordinate: {y_screen}')
-                        csv_writer.writerow([x_screen, y_screen])
+                        print(f'X Coordinate: {x_screen}, Y Coordinate: {y_screen}, Blink Detected: {blink_detected}')
+                        csv_writer.writerow([x_screen, y_screen,blink_detected])
                         
                     # Draw circles around the landmarks for visualization
                     for landmark in left_iris_landmarks + right_iris_landmarks:
